@@ -13,8 +13,8 @@ public class PointSource
   private Complex wave=new Complex();
   private double lambda=670e-9;  //approx wavelength of red light (m)
 
-  static final double TWOPI=Math.PI*2;
-  static final double c=3e+8;  //speed of light (m/s)
+//  static final double TWOPI=Math.PI*2;
+//  static final double c=3e+8;  //speed of light (m/s)
 
   public PointSource()
   {
@@ -95,13 +95,15 @@ public class PointSource
    */
   public Complex propagateWithoutAttenuation(PointSource p)
   {
+    final double c=3e+8;  //speed of light (m/s)
     double dist=point.distanceToPoint(p.getPoint3D());
 //    DebugMessages.debug("dist="+dist/lambda+" wavelengths");
     double time=dist/c;  //compute time for wave to travel over distance
 
     Complex w=new Complex();
 //    DebugMessages.debug("lambda="+lambda+" time="+time+" time*c/lambda="+time*c/lambda);
-    w.assignPolar(wave.getAmplitude(), wave.getPhase()+TWOPI*time*(c/lambda));
+//    w.assignPolar(wave.getAmplitude(), wave.getPhase()+TWOPI*time*(c/lambda));
+    w.assignPolar(wave.getAmplitude(), wave.getPhase()+Math.PI*2*time*(c/lambda));
 
     return w;
   }
@@ -109,6 +111,7 @@ public class PointSource
 
   public Complex propagateWith3dAttenuation(PointSource p)
   {
+    final double c=3e+8;  //speed of light (m/s)
     double dist=point.distanceToPoint(p.getPoint3D());
 //    DebugMessages.debug("dist="+dist/lambda+" wavelengths");
     double time=dist/c;  //compute time for wave to travel over distance
@@ -116,7 +119,8 @@ public class PointSource
     Complex w=new Complex();
 //    DebugMessages.debug("lambda="+lambda+" time="+time+" time*c/lambda="+time*c/lambda);
 
-    w.assignPolar((wave.getAmplitude()/(2*TWOPI*dist*dist)), wave.getPhase()+TWOPI*time*(c/lambda));
+//    w.assignPolar((wave.getAmplitude()/(2*TWOPI*dist*dist)), wave.getPhase()+TWOPI*time*(c/lambda));
+    w.assignPolar((wave.getAmplitude()/(2*Math.PI*2*dist*dist)), wave.getPhase()+Math.PI*2*time*(c/lambda));
 
     return w;
   }

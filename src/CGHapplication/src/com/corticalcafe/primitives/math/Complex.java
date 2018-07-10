@@ -7,11 +7,16 @@ package com.corticalcafe.primitives.math;
  * <p>Copyright: Copyright (c) 2003</p>
  * @author Alan Stein
  * @version 1.0
+ *
+ * HISTORY
+ *
+ * 20110417 - Corrected problem with randomized phases (thanks to Hib Engler for finding this)
+ * 
  */
 
 public class Complex
 {
-  public double re, im; //real and imaginary parts, accessible to outside world
+  public float re, im; //real and imaginary parts, accessible to outside world
 
   public Complex()
   {
@@ -19,20 +24,20 @@ public class Complex
 
   public Complex(double real, double imaginary)
   {
-    re=real;
-    im=imaginary;
+    re= (float) real;
+    im= (float) imaginary;
   }
 
   public void assignCartesian(double real, double imaginary)
   {
-    re=real;
-    im=imaginary;
+    re= (float) real;
+    im= (float) imaginary;
   }
 
   public void assignPolar(double amplitude, double phase)
   {
-    re=amplitude*Math.cos(phase);
-    im=amplitude*Math.sin(phase);
+    re= (float) (amplitude * Math.cos(phase));
+    im= (float) (amplitude * Math.sin(phase));
   }
 
   public Complex assign(Complex z)
@@ -96,7 +101,7 @@ public class Complex
 
   public void randomizePhase()
   {
-    assignPolar(getPhase(), Math.random()*Math.PI*2);
+    assignPolar(getAmplitude(), Math.random()*Math.PI*2);
   }
 
 }

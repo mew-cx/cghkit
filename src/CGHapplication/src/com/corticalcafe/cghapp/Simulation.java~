@@ -1,0 +1,625 @@
+/*
+ *
+ * The CorticalCafe Computer Generated Hologram (CGH) Construction Kit
+ * (C)2010 Alan Stein
+ * www.corticalcafe.com
+ *
+ * Code released under the GPL v3.
+ * http://www.gnu.org/licenses/gpl.html
+ *
+ * Software freedom is about:
+ *    - the freedom to use software for any purpose,
+ *    - the freedom to change software to suit your needs,
+ *    - the freedom to share software with your friends and neighbors, and
+ *    - the freedom to share the changes you make.
+ *
+ * Take the time to learn about and support free software.
+ * If you don't, who will?
+ *
+ */
+
+package com.corticalcafe.cghapp;
+
+import com.corticalcafe.primitives.physics.*;
+import com.corticalcafe.primitives.math.Complex;
+import com.corticalcafe.primitives.DebugMessages;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+
+/**
+ *
+ * @author astein
+ */
+public class Simulation implements Runnable{
+  PointSourceArray object;
+  ComplexPhotoPlate plate;
+
+  Thread simulationThread=new Thread(this);
+
+  public final static int ATTENUATIONTYPE_NONE=0;
+  public final static int ATTENUATIONTYPE_2D=1;
+  public final static int ATTENUATIONTYPE_3D=2;
+
+
+  private long currentRayNumber=0;
+  private long totalRayCount=0;
+  boolean randomPhase=false;
+  boolean multiThread=false;
+  long threadStartTime=0, simulationRunTime=0;
+  static boolean threadDone=true;   //this var is across all class instances
+  static int priority=5;       //default priority
+  int attenuationType=ATTENUATIONTYPE_NONE;
+
+
+  Simulation simulations[];
+  Thread simulationThreads[];
+  int numCores=1;
+//  boolean multiThreadRunning=false;
+
+
+  /**
+   *
+   */
+  public Simulation()
+  {
+  }
+
+  /**
+   *
+   */
+  public void run()
+  {
+      if(!multiThread)
+          computeHologram();
+      else
+          monitorThreads();
+  }
+
+  /**
+   *
+   * @param priority
+   */
+    @SuppressWarnings("static-access")
+  public void setPriority(int priority) {
+        Simulation.priority = priority;
+    }
+
+
+  /**
+   *
+   * @param flag
+   */
+  public void setThreadDone(boolean flag)
+  {
+      threadDone=flag;
+  }
+
+
+  public void setAttenuationType(boolean flag) {
+      if(flag)
+          setAttenuationType(ATTENUATIONTYPE_3D);
+      else
+          setAttenuationType(ATTENUATIONTYPE_NONE);
+  }
+
+
+  public void setAttenuationType(int attenuationType) {
+      this.attenuationType = attenuationType;
+  }
+
+
+
+  /**
+   * initialize the plate and object
+   * @param plateXres 
+   * @param plateYsampling
+   * @param plateYres
+   * @param plateXsampling
+   */
+  public void addNewPlate(int plateXres, int plateYres, double plateXsampling, double plateYsampling)
+  {
+    ComplexPhotoPlate tmpPlt=new ComplexPhotoPlate();
+
+    if(object==null)
+    {
+      initializeObject();
+      object=new PointSourceArray();
+    }
+//    object.debug("Object");
+
+    tmpPlt.initializePlate(plateXres, plateYres, plateXsampling, plateYsampling);
+
+    setPlate(tmpPlt);
+//    plate.initializePlate(67,1,10*1e-9);
+//    plate.initializePlate(67,1,100*1e-9);
+//    plate.initializePlate(60,1,(670e-9)/4.0);  //sample at 1/4 wavelength
+//    plate.initializePlate(600,600,(670e-9)/4.0); //set sample at 1/4 wavelength
+//    plate.initializePlate(600,600,(670e-9)/16.); //set sample at 1/16 wavelength
+//    plate.initializePlate(500,500,(670e-9)/16.); //set sample at 1/16 wavelength
+  }
+
+
+  /**
+   *
+   * @param tmpPlt
+   */
+  public void setPlate(ComplexPhotoPlate tmpPlt)
+  {
+      plate=tmpPlt;
+  }
+
+
+
+  /**
+   * This function computes the minimal Z depth at which to place a flat object (XY plane only)
+   * which still avoids aliasing at the edges of the plate where is is most likely to occur.
+   *
+   * The solution is found by solving 2 triangles which share a common angle (phi)
+   * and common side (h):
+   *
+   * 1)  A scalene triangle where the sides are:
+   * h=longest distance from a point in the object to a point on the plate
+   * h'=h-lambda/2 (the above side minus a worst case 180 degree phase shift), lambda is the frequency of the light used
+   * s=the sampling distance at plate
+   *
+   * 2)  A right triangle where the sides are:
+   * h=the same as above
+   * y=the largest displacement (projected along X or Y) between any object point and any plate pixel
+   * z=the minimal depth between object and plate at which aliasing will not occur
+   *
+   * The above 2 triangles are solved for the 2 common unknowns (phi and h) using the pythagoreon
+   * theorem and the law of cosines.
+   *
+   *  See the 20100911 scan of my notes for the diagrams.
+   *
+   * In the implementation below, I compute the depth based on X and Y aspects, then choose the greater depth.
+   *
+   * @return
+   */
+  public double getOptimalObjectDepth()
+  {
+      double retVal=0;
+
+      double lambda=getObject().getPointSource(0).getLambda();
+
+      double maxY=getPlate().maxYres*getPlate().ySamplingRate-getObject().getMinY();  //max Y displacement for a Y centered object
+
+      if(getObject().getMaxY()>maxY)
+          maxY=getObject().getMaxY();  //max Y displacement for a Y centered object
+      double hy=((2*maxY*getPlate().getYsamplingRate()/lambda)+(lambda/4));
+      double depthY=Math.sqrt((hy*hy)-(maxY*maxY));
+      
+
+      double maxX=getPlate().maxXres*getPlate().xSamplingRate-getObject().getMinX();  //max Y displacement for a Y centered object
+
+      if(getObject().getMaxX()>maxX)
+          maxX=getObject().getMaxX();  //max Y displacement for a Y centered object
+      double hx=((2*maxX*getPlate().getXsamplingRate()/lambda)+(lambda/4));
+      double depthX=Math.sqrt((hx*hx)-(maxY*maxY));
+      
+      retVal=depthY;
+
+      if(depthX>depthY)
+          retVal=depthX;
+
+      return retVal;
+  }
+
+
+  /**
+   * initialize the simulation
+   */
+  public void initializeSimulation()
+  {
+    totalRayCount=object.getNumberOfPoints()*plate.getNumberOfPoints();
+  }
+
+
+
+  /**
+   * start simulation
+   */
+  public void startSimulation() 
+  {
+    if(object==null || plate==null)
+    {
+      DebugMessages.error("Object and/or Plate have not been initialized!");
+    }
+    else
+    {
+        setThreadDone(false);
+        threadStartTime = System.currentTimeMillis();
+
+        if (!multiThread) {
+//                getPlate().debug("MainPlate");
+//                getPlate().getPointSource(0).debug("0");
+//                getPlate().getPointSource(1).debug("1");
+//                getPlate().getPointSource(22500).debug("22500");
+//                getPlate().getPointSource(22501).debug("22501");
+            
+              simulationThread=new Thread(this);
+              simulationThread.setPriority(priority);
+              simulationThread.start();
+        }
+        else
+        {
+            numCores=Runtime.getRuntime().availableProcessors();
+
+//            DebugMessages.inform("Num Cores="+numCores);
+
+            simulations=new Simulation[numCores];
+            simulationThreads=new Thread[numCores];
+
+//            getPlate().debug("Main");
+
+            for (int i = 0; i < numCores; i++) {
+
+                simulations[i] = new Simulation();     //create a new simulation for each core
+
+                simulations[i].setObject(getObject());     //copy the object
+
+                simulations[i].setPlate(getPlate().createSubPlate(i, numCores));    //create plate
+                
+                simulationThreads[i]=new Thread(simulations[i]);    //and get the thread
+
+                simulations[i].setMultithread(false);   //make sure each thread runs without further subdivision
+
+                simulations[i].setAttenuationType(attenuationType);
+
+//                simulations[i].debug(String.valueOf(i));
+//                simulations[i].getPlate().debug("Sim["+i+"]");
+            }
+
+
+//                simulations[0].getPlate().getPointSource(0).debug("[0]0");
+//                simulations[0].getPlate().getPointSource(1).debug("[0]1");
+//                simulations[1].getPlate().getPointSource(0).debug("[1]0");
+//                simulations[1].getPlate().getPointSource(1).debug("[1]1");
+
+
+            for (int i = 0; i < numCores; i++) {
+                simulationThreads[i].start();       //and start threads
+                simulationThreads[i].setPriority(priority);
+            }
+
+            simulationThread=new Thread(this);      //and launch this thread to monitor results
+            simulationThread.start();
+
+        }
+    }
+  }
+
+
+
+  /**
+   *
+   * @param str
+   */
+  public void debug(String str)
+  {
+      DebugMessages.inform(str+" ObjPts="+getObject().getNumberOfPoints()+" PlatePts="+
+              getPlate().getNumberOfPoints()+" Xsampling="+getPlate().getXsamplingRate()
+              +" Ysampling="+getPlate().getYsamplingRate());
+  }
+
+
+
+
+
+  // wait for all threads to finish, then collect results...
+  void monitorThreads()
+  {
+      do {
+//            DebugMessages.inform("Monitoring threads..."+simulations[1].getCurrentRayNumber());
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException ex) {
+                Logger.getLogger(Simulation.class.getName()).log(Level.SEVERE, null, ex);
+            }
+
+//            DebugMessages.inform("Time="+simulationRunTime);
+
+//            simulationRunTime = System.currentTimeMillis()-threadStartTime; //update timer
+      } while (areThreadsRunning());
+
+//      DebugMessages.inform("OrigMainPlatePts="+getPlate().getNumberOfPoints());
+
+      //after all threads finish, reconstruct the full plate
+      getPlate().clearPointSourceArray();
+      for (int i = 0; i < numCores; i++) {
+//            DebugMessages.inform("SubPlate["+i+"]Pts="+simulations[i].getPlate().getNumberOfPoints());
+            getPlate().addSubPlate(simulations[i].getPlate());
+      }
+
+//      simulationRunTime = System.currentTimeMillis()-threadStartTime;       //last update
+
+//      DebugMessages.inform("NewMainPlatePts="+getPlate().getNumberOfPoints());
+
+      setThreadDone(true);
+
+  }
+
+
+
+  /**
+   *
+   * @return
+   */
+  public double getCurrentRunTime()
+  {
+      simulationRunTime = System.currentTimeMillis()-threadStartTime;       //last update
+
+      return (double)(simulationRunTime/1000.0);
+  }
+
+
+
+  /**
+   *
+   * @return
+   */
+  public double getEstimatedTotalTime()
+  {
+      double estimatedTime=0;
+
+//      DebugMessages.inform("run="+getCurrentRunTime()+" %="+getPercentComplete());
+
+      estimatedTime = (100*getCurrentRunTime())/getPercentComplete();       //last update
+
+      return estimatedTime;
+  }
+
+
+  /**
+   *
+   * @return
+   */
+  public boolean isSimulationRunning()
+  {
+      return !threadDone;
+  }
+
+  boolean areThreadsRunning()
+  {
+      boolean retVal=false;
+
+      if(!multiThread)
+        retVal=simulationThread.isAlive();
+      else{
+            if(simulationThreads!=null){
+                for (int i = 0; i < numCores; i++) {
+                    retVal=retVal || simulationThreads[i].isAlive();       // test whether threads are running
+                }
+            }
+       }
+
+      return retVal;
+  }
+
+  /**
+   *
+   */
+  public void stopSimulation()
+  {
+      setThreadDone(true);
+  }
+
+  
+  /**
+   * initialize object point sources
+   */
+  void initializeObject()
+  {
+    PointSource p1;
+//    double spacing=670.0e-9;  //red laser
+//    double spacing=846.0e-7;  //space at 300 DPI
+//    double spacing=443.0e-7;  //space at 600 DPI
+    double spacing=443.0e-7;  //space at 600 DPI
+    double focalDistance=spacing*0;
+
+    p1=new PointSource(0.0*spacing, 0.0*spacing, 0.0*focalDistance, 1, 670e-9, 0);   //dot at origin
+    object.addPointSource(p1);
+
+    p1=new PointSource(150*spacing, 150.0*spacing, 0.0*focalDistance, 1, 670e-9, 0); //dot 1/2 inch away on diagonal
+    object.addPointSource(p1);
+
+//    p1=new PointSource(0.15, 0.15, 0.1, 1, 670e-9, 0, 0);
+//    object.addPointSource(p1);
+
+    //let's try an "X" pattern
+//    int numPts=10;  //num samples in each line
+//    for (int i = 0; i < numPts; i++)
+//    {
+//    p1=new PointSource(i*spacing, i*spacing, focalDistance*spacing, 1, 670e-9, 0, 0);
+//    object.addPointSource(p1);
+//    }
+//    for (int i = 0; i < numPts; i++)
+//    {
+//    p1=new PointSource(i*spacing, (numPts-i)*spacing, focalDistance*spacing, 1, 670e-9, 0, 0);
+//    object.addPointSource(p1);
+//    }
+
+
+    if(randomPhase)
+    {
+      for (int i = 0; i < object.getNumberOfPoints(); i++)
+      {
+        object.getPointSource(i).randomizePhase();
+      }
+    }
+
+    object.normalizeAmplitudes();
+  }
+
+
+  /**
+   * compute phase/amplitudes at all points on plate by summing contributions of
+   * waves propagated from all point sources.  Best to run this as a thread, and
+   * call getStatus() or getCurrentRayNumber() to find out how the simulation is
+   * progressing.
+   */
+  void computeHologram()
+  {
+    Complex c=null;
+
+    currentRayNumber=0;
+    totalRayCount=object.getNumberOfPoints()*plate.getNumberOfPoints();
+
+
+    for (int i = 0; i < object.getNumberOfPoints(); i++)
+    {
+      for (int j = 0; j < plate.getNumberOfPoints(); j++)
+      {
+        if(attenuationType==ATTENUATIONTYPE_NONE)
+            c=object.getPointSource(i).propagateWithoutAttenuation(plate.getPointSource(j));  //compute phase/amplitude of wave propagated from object to plate
+        else if(attenuationType==ATTENUATIONTYPE_3D)
+            c=object.getPointSource(i).propagateWith3dAttenuation(plate.getPointSource(j));  //compute phase/amplitude of wave propagated from object to plate
+
+        plate.getPointSource(j).getComplex().plusAssign(c); //sum the contribution (at the plate)
+        currentRayNumber++;
+      }
+
+      if(threadDone)
+          break;
+    }
+  }
+
+
+
+
+  /**
+   *
+   * @param flag
+   */
+  public void setRandomPhase(boolean flag)
+  {
+    randomPhase=flag;
+  }
+
+
+  /**
+   *
+   * @param flag
+   */
+  public void setMultithread(boolean flag)
+  {
+      multiThread=flag;
+  }
+
+  /**
+   * total number of rays to be computed
+   * @return
+   */
+  public long getTotalRayCount()
+  {
+    return totalRayCount;
+  }
+
+
+  /**
+   *
+   * @return
+   */
+  public double getPercentComplete()
+  {
+    double retVal=0;
+
+    if(!multiThread && getTotalRayCount()>0)
+    {
+          retVal= 100*getCurrentRayNumber()/getTotalRayCount();
+    }
+    else
+    {
+        if(!isSimulationRunning())
+          retVal=100;
+        else
+        {
+            for (int i = 0; i < numCores; i++) {
+                if(simulations[i].isSimulationRunning())
+                    retVal+=simulations[i].getPercentComplete();
+                else
+                    retVal+=100;
+            }
+            retVal=retVal/numCores;
+        }
+
+    }
+
+    if(retVal<1)
+        retVal=1;
+    
+    return retVal;
+  }
+
+  /**
+   * current ray that we are now computing, counts up to getTotalRayCount()
+   * @return
+   */
+  public long getCurrentRayNumber()
+  {
+    return currentRayNumber;
+  }
+
+  /**
+   * get text string describing current status
+   * @return
+   */
+  public String getStatus()
+  {
+    String retVal="";
+
+    if(!multiThread)
+    {
+        if(!simulationThread.isAlive())
+          retVal="Stopped (single)";
+        else
+    //      return ""+(int)(100*getCurrentRayNumber()/getTotalRayCount())+" % completed";
+          retVal=""+(int)getPercentComplete()+" % completed "
+              +"(1 core, "+getCurrentRayNumber()+"/"+getTotalRayCount()+")";
+    }
+    else
+    {
+        if(!isSimulationRunning())
+          retVal="Stopped (multi)";
+        else
+        {
+              retVal=""+(int)getPercentComplete()+" % completed "
+                  +"("+numCores+" cores, "+getCurrentRayNumber()+"/"+getTotalRayCount()+")";
+        }
+
+    }
+
+    return retVal;
+  }
+
+
+  /**
+   *
+   * @param objectPSA
+   */
+  public void setObject(PointSourceArray objectPSA)
+  {
+    object=objectPSA;
+  }
+
+
+  /**
+   * get object
+   * @return
+   */
+  public PointSourceArray getObject()
+  {
+    return object;
+  }
+
+  /**
+   * get plate
+   * @return
+   */
+  public ComplexPhotoPlate getPlate()
+  {
+    return plate;
+  }
+
+}

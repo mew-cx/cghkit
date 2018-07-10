@@ -13,7 +13,7 @@
  *    - the freedom to share software with your friends and neighbors, and
  *    - the freedom to share the changes you make.
  *
- * Take the time to learn about, use, and support free software.
+ * Take the time to learn about and support free software.
  * If you don't, who will?
  *
  */
@@ -24,6 +24,7 @@ package com.corticalcafe.cghapp;
 import javax.swing.*;
 import java.awt.*;
 
+import java.awt.image.*;
 import java.awt.event.*;
 
 import com.corticalcafe.utils.MiscUtils;

@@ -13,7 +13,7 @@
  *    - the freedom to share software with your friends and neighbors, and
  *    - the freedom to share the changes you make.
  *
- * Take the time to learn about, use, and support free software.
+ * Take the time to learn about and support free software.
  * If you don't, who will?
  *
  */
@@ -1120,32 +1120,27 @@ public class CGHapplicationView extends FrameView {
 
     void displayImage(BufferedImage im, String descr)
     {
-//        OutputFrame frame=new OutputFrame();
-        NewOutputFrame frame=new NewOutputFrame();
+        OutputFrame frame=new OutputFrame();
 
         frame.setSaveDir(inputFile);
 
         frame.setTitle(descr);
-        frame.setVisible(true);
-
-        int hsize=im.getWidth()+20;
-        int vsize=im.getHeight()+60;
-
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-
-        if(hsize>screenSize.getWidth())
-            hsize=(int)screenSize.getWidth();
-
-        if(vsize>screenSize.getHeight())
-            vsize=(int)screenSize.getHeight();
-
+        frame.setSize(im.getWidth()+20, im.getHeight()+20);
         frame.setImage(im);
         frame.pack();
-        frame.setSize(hsize, vsize);
-
         //Center the window
-        frame.setLocation((screenSize.width - frame.getWidth()) / 2, (screenSize.height - frame.getHeight()) / 2);
-
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        Dimension frameSize = frame.getSize();
+        if (frameSize.height > screenSize.height)
+        {
+          frameSize.height = screenSize.height;
+        }
+        if (frameSize.width > screenSize.width)
+        {
+          frameSize.width = screenSize.width;
+        }
+        frame.setLocation((screenSize.width - frameSize.width) / 2, (screenSize.height - frameSize.height) / 2);
+        frame.setVisible(true);
     }
 
 
