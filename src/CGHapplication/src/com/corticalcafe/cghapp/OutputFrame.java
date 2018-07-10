@@ -1,0 +1,115 @@
+/*
+ *
+ * The CorticalCafe Computer Generated Hologram (CGH) Construction Kit
+ * (C)2010 Alan Stein
+ * www.corticalcafe.com
+ *
+ * Code released under the GPL v3.
+ * http://www.gnu.org/licenses/gpl.html
+ *
+ * Software freedom is about:
+ *    - the freedom to use software for any purpose,
+ *    - the freedom to change software to suit your needs,
+ *    - the freedom to share software with your friends and neighbors, and
+ *    - the freedom to share the changes you make.
+ *
+ * Take the time to learn about, use, and support free software.
+ * If you don't, who will?
+ *
+ */
+
+
+package com.corticalcafe.cghapp;
+
+import javax.swing.*;
+import java.awt.*;
+
+import java.awt.image.*;
+import java.awt.event.*;
+
+import com.corticalcafe.utils.MiscUtils;
+import java.io.File;
+
+
+/**
+ *
+ * @author astein
+ */
+public class OutputFrame extends JFrame{
+  JLabel jLabel1 = new JLabel();
+  JMenuBar jMenuBar1 = new JMenuBar();
+  JMenu jMenu1 = new JMenu();
+  JMenuItem jMenuItemSave = new JMenuItem();
+  JScrollPane jScrollPane1 = new JScrollPane();
+
+  File curDir=new File("");
+
+  public OutputFrame()
+  {
+    try
+    {
+      jbInit();
+    }
+    catch(Exception e)
+    {
+      e.printStackTrace();
+    }
+  }
+
+  public void setSaveDir(File dir)
+  {
+      curDir=dir;
+  }
+
+  private void jbInit() throws Exception
+  {
+    jLabel1.setText("");
+    jMenu1.setText("File");
+    jMenuItemSave.setText("Save GIF...");
+    jMenuItemSave.addActionListener(new java.awt.event.ActionListener()
+    {
+      public void actionPerformed(ActionEvent e)
+      {
+        jMenuItemSave_actionPerformed(e);
+      }
+    });
+//    this.getContentPane().add(jLabel1,  BorderLayout.SOUTH);
+    jScrollPane1.setAutoscrolls(true);
+    this.getContentPane().add(jScrollPane1, BorderLayout.CENTER);
+    jScrollPane1.getViewport().add(jLabel1);
+    jMenuBar1.add(jMenu1);
+    jMenu1.add(jMenuItemSave);
+    this.setJMenuBar(jMenuBar1);
+ }
+
+  /**
+   * display image in center of frame
+   * @param image
+   */
+  public void setImage(Image image)
+  {
+    jLabel1.setIcon(new ImageIcon(image));
+    this.repaint();
+  }
+
+  void jMenuItemSave_actionPerformed(ActionEvent e)
+  {
+    //  Captures from awt based component
+      Component c=jLabel1;
+      Image img=c.createImage(c.getWidth(), c.getHeight());
+      Graphics g=img.getGraphics();
+      c.printAll(g);
+
+     JFileChooser jfc=new JFileChooser(curDir);
+     jfc.setSelectedFile(new File(getTitle()+".gif"));
+
+     int result=jfc.showSaveDialog(this);
+
+      if(result==JFileChooser.APPROVE_OPTION)
+      {
+        File f=jfc.getSelectedFile();
+        MiscUtils.writeImage(img, MiscUtils.formatGIF, f);
+      }
+  }
+
+}
